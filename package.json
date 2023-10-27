@@ -11,6 +11,7 @@
 		"watch": "node ./esbuild.config.js --watch"
 	},
 	"devDependencies": {
+		"@wordpress/dependency-extraction-webpack-plugin": "^4.27.0",
 		"esbuild": "^0.13.3",
 		"json2php": "^0.0.4"
 	}
