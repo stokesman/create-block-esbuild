@@ -2,55 +2,48 @@ const esbuild = require( 'esbuild' );
 const path = require( 'path' );
 const fs = require( 'fs' );
 const json2php = require( 'json2php' );
+const {
+	defaultRequestToExternal,
+	defaultRequestToHandle
+} = require( '@wordpress/dependency-extraction-webpack-plugin/lib/util.js' );
 
 const args = process.argv.slice( 2 );
 
-const WORDPRESS_NAMESPACE = '@wordpress/';
-const BUNDLED_PACKAGES = [ '@wordpress/icons', '@wordpress/interface' ];
-
-/**
- * Given a string, returns a new string with dash separators converted to
- * camelCase equivalent. This is not as aggressive as `_.camelCase` in
- * converting to uppercase, where Lodash will also capitalize letters
- * following numbers.
- *
- * @param {string} string Input dash-delimited string.
- * @return {string} Camel-cased string.
- */
- function camelCaseDash( string ) {
-	return string.replace( /-([a-z])/g, ( _, letter ) => letter.toUpperCase() );
-}
-
 /**
  * Based on https://github.com/evanw/esbuild/issues/337#issuecomment-706765332.
+ * 
+ * @type {import('esbuild').Plugin}
  */
 const DependencyExtractionPlugin = {
 	name: 'dependency-extraction',
 	setup( build ) {
 		const options = build.initialOptions
-		const deps = [ 'wp-element' ];
+		const extractedMap = new Map;
+		const handles = [];
 
-		build.onResolve( { filter: /^@wordpress\// }, ( args ) => BUNDLED_PACKAGES.includes( args.path ) ? undefined : {
-			path: args.path,
-			namespace: 'wp-globals',
-		});
+		build.onResolve( { filter: /^[^.]/ }, ( { path } ) => {
+			const global = defaultRequestToExternal( path );
+			if ( ! global ) return;
 
-		build.onLoad({ filter: /.*/, namespace: 'wp-globals' }, ( { path } ) => {
+			extractedMap.set( path, global );
+			return { path, namespace: 'wp-globals' };
+		} );
 
-			const package = path.substring(WORDPRESS_NAMESPACE.length)
-			const name = camelCaseDash( package );
-
-			// Store dependencies for later.
-			deps.push( `wp-${package}` );
+		build.onLoad( { filter: /.*/, namespace: 'wp-globals' }, ( { path } ) => {
+			// Store handles for later.
+			handles.push( defaultRequestToHandle( path ) );
+			const global = extractedMap.get( path );
 
 			return {
-				contents: `module.exports = window["wp"][${JSON.stringify(name)}]`,
+				contents: `module.exports = window.${
+					Array.isArray( global ) ? global.join( '.') : global
+				}`,
 			}
 		});
 
 		build.onEnd( () => {
 			const data = {
-				dependencies: Array.from( deps ).sort(),
+				dependencies: Array.from( handles ).sort(),
 				version: null,
 			};
 
