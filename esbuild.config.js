@@ -69,7 +69,5 @@ esbuild.build({
 	minify: args.includes('--minify'),
 	watch: args.includes('--watch'),
 	logLevel: 'info',
-	jsxFactory: 'wp.element.createElement',
-	jsxFragment: 'wp.element.Fragment',
 	plugins: [DependencyExtractionPlugin],
 }).catch(() => process.exit(1))
